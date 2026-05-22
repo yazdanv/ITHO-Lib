@@ -3,12 +3,17 @@
  */
 
 #include "CC1101.h"
+#ifdef ESP32
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
 
 // default constructor
 CC1101::CC1101()
 {
 #ifdef ESP32
-	SPI.begin(CC1101_SCK_PIN, CC1101_MISO_PIN, CC1101_MOSI_PIN, CC1101_CSN_PIN);
+	// Pass -1 for SS so the library does not manage CS; we drive it manually.
+	SPI.begin(CC1101_SCK_PIN, CC1101_MISO_PIN, CC1101_MOSI_PIN, -1);
 	pinMode(CC1101_CSN_PIN, OUTPUT);
 	digitalWrite(CC1101_CSN_PIN, HIGH);
 #else
@@ -28,6 +33,7 @@ CC1101::~CC1101()
 // SPI helper functions select() and deselect()
 inline void CC1101::select(void) {
 #ifdef ESP32
+	SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
 	digitalWrite(CC1101_CSN_PIN, LOW);
 #else
 	digitalWrite(SS, LOW);
@@ -37,6 +43,7 @@ inline void CC1101::select(void) {
 inline void CC1101::deselect(void) {
 #ifdef ESP32
 	digitalWrite(CC1101_CSN_PIN, HIGH);
+	SPI.endTransaction();
 #else
 	digitalWrite(SS, HIGH);
 #endif
@@ -45,11 +52,17 @@ inline void CC1101::deselect(void) {
 void CC1101::spi_waitMiso()
 {
 #ifdef ESP32
-	// On ESP32/FreeRTOS, yield() in a tight loop blocks the interrupt watchdog.
-	// Use a plain busy-wait with a 1 ms timeout to avoid WDT crashes.
+	// Busy-wait up to 1 ms for CC1101 chip-ready (MISO LOW after CSN LOW).
+	// On timeout, yield to the idle task so the interrupt WDT is fed, then
+	// continue. xPortInIsrContext() guards against calling vTaskDelay in ISR.
 	uint32_t start = micros();
 	while (digitalRead(CC1101_MISO_PIN) == HIGH) {
-		if (micros() - start > 1000) break;
+		if (micros() - start > 1000) {
+			if (!xPortInIsrContext()) {
+				vTaskDelay(1); // suspend 1 tick → idle task runs → IWDT fed
+			}
+			break;
+		}
 	}
 #else
 	while(digitalRead(MISO) == HIGH) yield();
