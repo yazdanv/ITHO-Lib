@@ -140,7 +140,10 @@ RXBYTES when receiving or TXBYTES when transmitting, and WORTIME1/WORTIME0 at an
 //uint8_t CC1101::readRegisterWithSyncProblem(uint8_t address, uint8_t registerType)
 uint8_t /* ICACHE_RAM_ATTR */ CC1101::readRegisterWithSyncProblem(uint8_t address, uint8_t registerType)
 {
-	uint8_t value1, value2;	
+	uint8_t value1, value2;
+#ifdef ESP32
+	uint8_t tries = 10; // prevent infinite loop if CC1101 is unresponsive
+#endif
 	
 	value1 = readRegister(address | registerType);
 	
@@ -149,11 +152,12 @@ uint8_t /* ICACHE_RAM_ATTR */ CC1101::readRegisterWithSyncProblem(uint8_t addres
 	{
 		value2 = value1;
 		value1 = readRegister(address | registerType);
-#ifdef ESP32
-		portYIELD(); // feed FreeRTOS scheduler / interrupt WDT
-#endif
 	} 
+#ifdef ESP32
+	while (value1 != value2 && --tries > 0);
+#else
 	while (value1 != value2);
+#endif
 	
 	return value1;
 }
@@ -280,7 +284,7 @@ void CC1101::sendData(CC1101Packet *packet)
 			//check if there is free space in the fifo
 			while ((txStatus = (readRegisterMedian3(CC1101_TXBYTES | CC1101_STATUS_REGISTER) & CC1101_BITS_RX_BYTES_IN_FIFO)) > (CC1101_DATA_LEN - 2)) {
 #ifdef ESP32
-				portYIELD();
+				delay(1); // vTaskDelay lets idle task run, resetting the IWDT
 #endif
 			}
 			
@@ -302,7 +306,7 @@ void CC1101::sendData(CC1101Packet *packet)
 		MarcState = (readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER) & CC1101_BITS_MARCSTATE);
 //		if (MarcState == CC1101_MARCSTATE_TXFIFO_UNDERFLOW) Serial.print(F("TXFIFO_UNDERFLOW occured in sendData() \n"));
 #ifdef ESP32
-		portYIELD();
+		delay(1); // vTaskDelay lets idle task run, resetting the IWDT
 #endif
 	}
   	while((MarcState != CC1101_MARCSTATE_IDLE) && (MarcState != CC1101_MARCSTATE_TXFIFO_UNDERFLOW));
