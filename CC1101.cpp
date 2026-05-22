@@ -7,9 +7,15 @@
 // default constructor
 CC1101::CC1101()
 {
+#ifdef ESP32
+	SPI.begin(CC1101_SCK_PIN, CC1101_MISO_PIN, CC1101_MOSI_PIN, CC1101_CSN_PIN);
+	pinMode(CC1101_CSN_PIN, OUTPUT);
+	digitalWrite(CC1101_CSN_PIN, HIGH);
+#else
 	SPI.begin();
 #ifdef ESP8266
 	pinMode(SS, OUTPUT);
+#endif
 #endif
 } //CC1101
 
@@ -21,16 +27,28 @@ CC1101::~CC1101()
 /***********************/
 // SPI helper functions select() and deselect()
 inline void CC1101::select(void) {
+#ifdef ESP32
+	digitalWrite(CC1101_CSN_PIN, LOW);
+#else
 	digitalWrite(SS, LOW);
+#endif
 }
 
 inline void CC1101::deselect(void) {
+#ifdef ESP32
+	digitalWrite(CC1101_CSN_PIN, HIGH);
+#else
 	digitalWrite(SS, HIGH);
+#endif
 }
 
 void CC1101::spi_waitMiso()
 {
-    while(digitalRead(MISO) == HIGH) yield();
+#ifdef ESP32
+	while(digitalRead(CC1101_MISO_PIN) == HIGH) yield();
+#else
+	while(digitalRead(MISO) == HIGH) yield();
+#endif
 }
 
 void CC1101::init()
