@@ -10,6 +10,15 @@
 #include <SPI.h>
 // On Arduino, SPI pins are predefined
 
+// ESP32-C3 custom SPI pin definitions (E07-M1101D Blue Board)
+#ifdef ESP32
+#define CC1101_GDO0_PIN  3   // GPIO3  - Interrupt (IRQ)
+#define CC1101_CSN_PIN   4   // GPIO4  - SPI Chip Select
+#define CC1101_SCK_PIN   5   // GPIO5  - SPI Clock
+#define CC1101_MOSI_PIN  6   // GPIO6  - SPI MOSI
+#define CC1101_MISO_PIN  7   // GPIO7  - SPI MISO
+#endif
+
 /*	Type of transfers */
 #define CC1101_WRITE_BURST						0x40
 #define CC1101_READ_SINGLE						0x80
