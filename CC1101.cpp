@@ -45,7 +45,12 @@ inline void CC1101::deselect(void) {
 void CC1101::spi_waitMiso()
 {
 #ifdef ESP32
-	while(digitalRead(CC1101_MISO_PIN) == HIGH) yield();
+	// On ESP32/FreeRTOS, yield() in a tight loop blocks the interrupt watchdog.
+	// Use a plain busy-wait with a 1 ms timeout to avoid WDT crashes.
+	uint32_t start = micros();
+	while (digitalRead(CC1101_MISO_PIN) == HIGH) {
+		if (micros() - start > 1000) break;
+	}
 #else
 	while(digitalRead(MISO) == HIGH) yield();
 #endif
