@@ -3,10 +3,6 @@
  */
 
 #include "CC1101.h"
-#ifdef ESP32
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#endif
 
 // default constructor
 CC1101::CC1101()
@@ -52,17 +48,13 @@ inline void CC1101::deselect(void) {
 void CC1101::spi_waitMiso()
 {
 #ifdef ESP32
-	// Busy-wait up to 1 ms for CC1101 chip-ready (MISO LOW after CSN LOW).
-	// On timeout, yield to the idle task so the interrupt WDT is fed, then
-	// continue. xPortInIsrContext() guards against calling vTaskDelay in ISR.
+	// 200 µs busy-wait — covers CC1101 chip-ready max (150 µs per datasheet).
+	// Does NOT disable interrupts, so the FreeRTOS tick can fire normally.
+	// vTaskDelay() was removed: it prevented the idle task from running during
+	// WiFi scanning, causing the interrupt watchdog to fire.
 	uint32_t start = micros();
 	while (digitalRead(CC1101_MISO_PIN) == HIGH) {
-		if (micros() - start > 1000) {
-			if (!xPortInIsrContext()) {
-				vTaskDelay(1); // suspend 1 tick → idle task runs → IWDT fed
-			}
-			break;
-		}
+		if (micros() - start > 200) break;
 	}
 #else
 	while(digitalRead(MISO) == HIGH) yield();
