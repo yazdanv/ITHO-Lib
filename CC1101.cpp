@@ -8,8 +8,15 @@
 CC1101::CC1101()
 {
 #ifdef ESP32
-	// Pass -1 for SS so the library does not manage CS; we drive it manually.
+	// Configure the SPI bus once. CC1101 is the sole device on this bus,
+	// so we never call beginTransaction/endTransaction — those hold a
+	// portENTER_CRITICAL (disables all IRQs incl. FreeRTOS tick) across
+	// the entire transaction window, which starves the tick ISR during
+	// spi_waitMiso() and triggers the interrupt WDT on single-core ESP32-C3.
 	SPI.begin(CC1101_SCK_PIN, CC1101_MISO_PIN, CC1101_MOSI_PIN, -1);
+	SPI.setFrequency(4000000);
+	SPI.setDataMode(SPI_MODE0);
+	SPI.setBitOrder(MSBFIRST);
 	pinMode(CC1101_CSN_PIN, OUTPUT);
 	digitalWrite(CC1101_CSN_PIN, HIGH);
 #else
@@ -29,7 +36,6 @@ CC1101::~CC1101()
 // SPI helper functions select() and deselect()
 inline void CC1101::select(void) {
 #ifdef ESP32
-	SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
 	digitalWrite(CC1101_CSN_PIN, LOW);
 #else
 	digitalWrite(SS, LOW);
@@ -39,7 +45,6 @@ inline void CC1101::select(void) {
 inline void CC1101::deselect(void) {
 #ifdef ESP32
 	digitalWrite(CC1101_CSN_PIN, HIGH);
-	SPI.endTransaction();
 #else
 	digitalWrite(SS, HIGH);
 #endif
