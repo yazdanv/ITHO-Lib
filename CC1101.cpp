@@ -248,7 +248,14 @@ uint8_t CC1101::receiveData(CC1101Packet* packet, uint8_t length)
 		packet->length = 0;
 		writeCommand(CC1101_SIDLE); //idle    
 		writeCommand(CC1101_SFRX); //flush RX buffer
-		writeCommand(CC1101_SRX); //switch to RX state     		
+		writeCommand(CC1101_SRX); //switch to RX state
+#ifdef ESP32
+		// On ESP32/FreeRTOS the idle task only runs when all other tasks block.
+		// Without this delay the main loop polls at full speed and the idle task
+		// never runs, starving the interrupt watchdog (IWDT fires at 300 ms).
+		// delay(1) = vTaskDelay(1 tick) — suspends this task so idle can run.
+		delay(1);
+#endif
 	}
 
 	return packet->length;
