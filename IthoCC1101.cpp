@@ -187,7 +187,11 @@ void IthoCC1101::initReceive()
   writeCommand(CC1101_SCAL);
 
   //wait for calibration to finish
+#ifdef ESP32
+  { uint32_t _t = millis(); while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE && millis() - _t < 500) delay(1); }
+#else
   while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE) yield();
+#endif
 
   writeRegister(CC1101_FSCAL2 , 0x00);
   writeRegister(CC1101_MCSM0 , 0x18);     //no auto calibrate
@@ -230,7 +234,11 @@ void IthoCC1101::initReceive()
   writeCommand(CC1101_SCAL);
 
   //wait for calibration to finish
+#ifdef ESP32
+  { uint32_t _t = millis(); while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE && millis() - _t < 500) delay(1); }
+#else
   while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_IDLE) yield();
+#endif
 
   writeRegister(CC1101_MCSM0 , 0x18);     //no auto calibrate
 
@@ -242,7 +250,11 @@ void IthoCC1101::initReceive()
 
   writeCommand(CC1101_SRX);
 
+#ifdef ESP32
+  { uint32_t _t = millis(); while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX && millis() - _t < 500) delay(1); }
+#else
   while ((readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) != CC1101_MARCSTATE_RX) yield();
+#endif
 
   initReceiveMessage();
 }
@@ -271,10 +283,19 @@ void  IthoCC1101::initReceiveMessage()
   writeCommand(CC1101_SRX); //switch to RX state
 
   // Check that the RX state has been entered
-  while (((marcState = readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) & CC1101_BITS_MARCSTATE) != CC1101_MARCSTATE_RX)
   {
-    if (marcState == CC1101_MARCSTATE_RXFIFO_OVERFLOW) // RX_OVERFLOW
-      writeCommand(CC1101_SFRX); //flush RX buffer
+#ifdef ESP32
+    uint32_t _t = millis();
+#endif
+    while (((marcState = readRegisterWithSyncProblem(CC1101_MARCSTATE, CC1101_STATUS_REGISTER)) & CC1101_BITS_MARCSTATE) != CC1101_MARCSTATE_RX)
+    {
+      if (marcState == CC1101_MARCSTATE_RXFIFO_OVERFLOW) // RX_OVERFLOW
+        writeCommand(CC1101_SFRX); //flush RX buffer
+#ifdef ESP32
+      if (millis() - _t > 500) break; // safety timeout
+      delay(1);
+#endif
+    }
   }
 }
 
